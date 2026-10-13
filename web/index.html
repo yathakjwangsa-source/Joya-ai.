@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10192d">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>Joya.ai — Learn with confidence</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <section id="auth-screen" class="auth-screen hidden">
+    <div class="auth-card">
+      <a class="brand auth-brand" href="#" aria-label="Joya home">
+        <span class="brand-mark">J</span>
+        <span>joya<span class="brand-dot">.ai</span><small>LEARN. SOLVE. GROW.</small></span>
+      </a>
+      <span class="eyebrow">YOUR PERSONAL LEARNING SPACE</span>
+      <h1 id="auth-title">Welcome back.</h1>
+      <p id="auth-description">Sign in to keep your learning private and pick up where you left off.</p>
+      <form id="login-form" class="auth-form">
+        <label>Email address<input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="you@example.com"></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" minlength="10" required placeholder="At least 10 characters"></label>
+        <button class="button button-primary" type="submit">Sign in <span>→</span></button>
+        <p>New to Joya? <button id="show-register" class="text-button" type="button">Create an account</button></p>
+      </form>
+      <form id="register-form" class="auth-form hidden">
+        <label>Your name<input name="name" type="text" autocomplete="name" maxlength="48" required placeholder="How should Joya greet you?"></label>
+        <label>Email address<input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="you@example.com"></label>
+        <label>Password<input name="password" type="password" autocomplete="new-password" minlength="10" maxlength="256" required placeholder="Choose at least 10 characters"></label>
+        <button class="button button-primary" type="submit">Create private account <span>→</span></button>
+        <p>Already have an account? <button id="show-login" class="text-button" type="button">Sign in</button></p>
+      </form>
+      <div id="auth-message" class="auth-message" role="alert"></div>
+      <p class="privacy-note">Your notes and conversations are private to your account. Use a unique password and do not share it.</p>
+    </div>
+  </section>
+
+  <div class="app-shell hidden" id="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" data-view="home" aria-label="Joya home">
+        <span class="brand-mark">J</span>
+        <span>joya<span class="brand-dot">.ai</span><small>LEARN. SOLVE. GROW.</small></span>
+      </a>
+      <div class="nav-label">LEARNING SPACE</div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="home"><span>⌂</span> Overview</button>
+        <button class="nav-item" data-view="chat"><span>✳</span> Ask Joya</button>
+        <button class="nav-item" data-view="learn"><span>▤</span> Explore concepts</button>
+        <button class="nav-item" data-view="jee"><span>◈</span> JEE practice</button>
+        <button class="nav-item" data-view="notes"><span>▧</span> My notes</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="local-badge"><span class="status-dot"></span><span id="ai-status">Checking Joya AI…</span></div>
+        <p>Made for curious minds.<br>One clear step at a time.</p>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button>
+        <div class="breadcrumb">Your learning space <span>/</span> <strong id="page-label">Overview</strong></div>
+        <div class="account-actions"><label class="name-field"><span>Learning with</span><input id="user-name" maxlength="48" value="Learner" aria-label="Your name"></label><button id="logout-button" class="button button-outline logout-button" type="button">Sign out</button></div>
+      </header>
+
+      <section class="view active" id="view-home">
+        <div class="welcome-panel">
+          <div class="welcome-copy">
+            <span class="eyebrow">YOUR AI LEARNING COMPANION</span>
+            <h1 id="greeting">A brighter way to learn.</h1>
+            <p>Explore big ideas, solve challenging problems, and build understanding at your own pace.</p>
+            <button class="button button-light" data-view="chat">Ask Joya a question <span>→</span></button>
+          </div>
+          <div class="orbit-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="planet"></div><span class="star star-one">✦</span><span class="star star-two">✧</span></div>
+        </div>
+
+        <div class="section-heading"><div><span class="eyebrow">PICK UP YOUR CURIOSITY</span><h2>What would you like to do?</h2></div></div>
+        <div class="action-grid">
+          <button class="action-card card-purple" data-view="chat"><span class="card-icon">✳</span><strong>Ask Joya</strong><span>Get a patient, step-by-step explanation.</span><b>Start a conversation <i>→</i></b></button>
+          <button class="action-card card-blue" data-view="learn"><span class="card-icon">▤</span><strong>Explore concepts</strong><span>Physics, chemistry, maths, space, and more.</span><b>Browse learning topics <i>→</i></b></button>
+          <button class="action-card card-gold" data-view="jee"><span class="card-icon">◈</span><strong>JEE practice lab</strong><span>Try Main, Advanced, and mixed practice tests.</span><b>Practise now <i>→</i></b></button>
+          <button class="action-card card-green" data-view="notes"><span class="card-icon">▧</span><strong>Learning notes</strong><span>Keep useful ideas together for review.</span><b>Open your notes <i>→</i></b></button>
+        </div>
+
+        <div class="section-heading stats-heading"><div><span class="eyebrow">YOUR JOURNEY</span><h2>Learning at a glance</h2></div></div>
+        <div class="stats-grid">
+          <div class="stat-card"><span class="stat-icon">▤</span><span class="stat-value" id="stat-lessons">—</span><span class="stat-label">Concepts to explore</span></div>
+          <div class="stat-card"><span class="stat-icon">▧</span><span class="stat-value" id="stat-notes">—</span><span class="stat-label">Notes saved</span></div>
+          <div class="stat-card"><span class="stat-icon">◈</span><span class="stat-value" id="stat-tests">—</span><span class="stat-label">Practice tests completed</span></div>
+          <div class="stat-card"><span class="stat-icon">✓</span><span class="stat-value" id="stat-correct">—</span><span class="stat-label">JEE questions correct</span></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-chat">
+        <div class="page-intro"><span class="eyebrow">YOUR PATIENT STUDY PARTNER</span><h1>Ask Joya</h1><p>Ask about an idea or share a problem. Joya aims to explain the reasoning—not just give an answer.</p></div>
+        <div class="chat-layout">
+          <div class="chat-card">
+            <div class="chat-heading"><span class="avatar">J</span><div><strong>Joya</strong><small id="chat-availability">Ready to learn with you</small></div><button id="clear-chat" class="icon-button" title="Clear conversation">↺</button></div>
+            <div id="chat-messages" class="chat-messages" aria-live="polite">
+              <div class="message assistant"><div class="message-avatar">J</div><div class="bubble"><strong>Hello! I’m Joya.</strong><p>What are you curious about today? You can ask me to explain a concept, solve a problem step by step, or help you prepare for JEE.</p><small>Tip: include what you tried and where you got stuck.</small></div></div>
+            </div>
+            <form id="chat-form" class="chat-form"><textarea id="chat-input" rows="2" maxlength="4000" placeholder="Ask a question or paste a problem…" required></textarea><button class="button button-primary" type="submit">Send <span>↑</span></button></form>
+            <div class="chat-hint">Joya can make mistakes. Check important answers with trusted learning materials.</div>
+          </div>
+          <aside class="prompt-card"><span class="eyebrow">TRY ASKING</span><h3>Good questions lead to clear answers.</h3><button class="prompt-suggestion">Explain Newton’s second law with a simple example.</button><button class="prompt-suggestion">Solve this JEE problem and show every step.</button><button class="prompt-suggestion">What is a black hole, and how do we know it exists?</button><button class="prompt-suggestion">Teach me how to balance a chemical equation.</button></aside>
+        </div>
+      </section>
+
+      <section class="view" id="view-learn">
+        <div class="page-intro"><span class="eyebrow">START WITH THE FOUNDATIONS</span><h1>Explore concepts</h1><p>Browse clear introductions to science, mathematics, technology, the Universe, and global knowledge.</p></div>
+        <div class="search-wrap"><span>⌕</span><input id="lesson-search" type="search" placeholder="Search concepts, e.g. energy or galaxies"></div>
+        <div id="lesson-grid" class="lesson-grid"><div class="loading-card">Loading your learning library…</div></div>
+      </section>
+
+      <section class="view" id="view-jee">
+        <div class="page-intro"><span class="eyebrow">PRACTISE WITH PURPOSE</span><h1>JEE practice lab</h1><p>Try original JEE-style practice questions, check your reasoning, and learn from each explanation. These are practice exercises, not official exam papers.</p></div>
+        <div id="jee-start-panel" class="jee-start-grid">
+          <button class="test-card" data-level="main"><span class="test-tag tag-blue">JEE MAIN STYLE</span><h2>Build your fundamentals</h2><p>Practice Physics, Chemistry, and Mathematics questions with explanations.</p><span class="test-link">Start Main practice →</span></button>
+          <button class="test-card" data-level="advanced"><span class="test-tag tag-purple">JEE ADVANCED STYLE</span><h2>Stretch your reasoning</h2><p>Try more challenging multi-step questions and review the worked solutions.</p><span class="test-link">Start Advanced practice →</span></button>
+          <button class="test-card mock-card" data-level="mock"><span class="test-tag tag-gold">MIXED MOCK TEST</span><h2>Put it together</h2><p>A balanced practice set across all three subjects, with a 30-minute timer.</p><span class="test-link">Start mock test →</span></button>
+        </div>
+        <div id="test-panel" class="test-panel hidden">
+          <div class="test-top"><div><span class="eyebrow" id="test-kind">PRACTICE TEST</span><h2 id="test-title">Your questions</h2><p>+4 correct · −1 incorrect · 0 skipped</p></div><div id="test-timer" class="test-timer hidden">30:00</div><button class="button button-outline" id="cancel-test">Exit test</button></div>
+          <form id="jee-form"><div id="question-list"></div><button class="button button-primary submit-test" type="submit">Submit answers <span>→</span></button></form>
+        </div>
+        <div id="results-panel" class="results-panel hidden"></div>
+      </section>
+
+      <section class="view" id="view-notes">
+        <div class="page-intro"><span class="eyebrow">SAVE THE IDEAS THAT STICK</span><h1>My learning notes</h1><p>Write down useful explanations, reminders, or questions you want to revisit.</p></div>
+        <div class="notes-layout">
+          <form id="note-form" class="note-form"><h2>Add a note</h2><label>Title<input id="note-title" maxlength="120" required placeholder="e.g. Newton’s laws"></label><label>Your note<textarea id="note-content" maxlength="10000" rows="6" required placeholder="Write a short explanation or reminder…"></textarea></label><button class="button button-primary" type="submit">Save note <span>＋</span></button></form>
+          <div id="notes-list" class="notes-list"><div class="loading-card">Loading your notes…</div></div>
+        </div>
+      </section>
+
+      <div id="toast" class="toast" role="status"></div>
+      <footer class="site-footer">Joya.ai <span>•</span> A friendly space for learning, problem-solving, and curiosity.</footer>
+    </main>
+  </div>
+</body>
+</html>
