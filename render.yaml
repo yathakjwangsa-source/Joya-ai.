@@ -2,7 +2,7 @@ services:
   - type: web
     name: joya-ai
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn web_app:app --workers 1 --threads 8 --timeout 180 --bind 0.0.0.0:$PORT
     healthCheckPath: /health
@@ -10,18 +10,8 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: joya-db
-          property: connectionString
-      - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4o-mini
       - key: JOYASECURECOOKIES
         value: "true"
-
-databases:
-  - name: joya-db
-    databaseName: joya
-    user: joya
-    plan: basic-256mb
