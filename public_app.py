@@ -7,7 +7,9 @@ import os
 import random
 import secrets
 import time
-from datetime import date, datetime
+import urllib.error
+import urllib.request
+from datetime import datetime
 from functools import wraps
 from pathlib import Path
 
@@ -21,7 +23,6 @@ from flask import (
     session as web_session,
     stream_with_context,
 )
-from openai import APIConnectionError, APIStatusError, OpenAI
 from sqlalchemy import (
     Column,
     Float,
@@ -38,8 +39,6 @@ from sqlalchemy import (
     select,
     update,
 )
-from sqlalchemy.dialects.postgresql import insert as postgres_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -112,14 +111,6 @@ active_tests = Table(
     Column("questions_json", Text, nullable=False),
     Column("expires_at", Float, nullable=False),
 )
-ai_usage = Table(
-    "ai_usage",
-    metadata,
-    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-    Column("usage_date", String(10), primary_key=True),
-    Column("requests", Integer, nullable=False, default=0),
-    UniqueConstraint("user_id", "usage_date"),
-)
 metadata.create_all(engine)
 
 app = Flask(__name__)
@@ -133,9 +124,18 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=60 * 60 * 24 * 14,
 )
 
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-AI_DAILY_LIMIT = 30
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "").strip() or CORE["OLLAMA_URL"]
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", CORE["OLLAMA_MODEL"])
+OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", "").strip()
+OLLAMA_TAGS_URL = OLLAMA_URL.rsplit("/api/", 1)[0] + "/api/tags"
 JOYA_SYSTEM_PROMPT = CORE["JOYA_SYSTEM_PROMPT"]
+
+
+def ollama_headers():
+    headers = {"Content-Type": "application/json"}
+    if OLLAMA_API_KEY:
+        headers["Authorization"] = f"Bearer {OLLAMA_API_KEY}"
+    return headers
 
 
 def login_required(function):
@@ -206,6 +206,25 @@ def javascript():
     return send_from_directory(WEB_DIR, "app.js")
 
 
+@app.get("/logo.svg")
+def logo():
+    return send_from_directory(WEB_DIR, "logo.svg", mimetype="image/svg+xml")
+
+
+@app.get("/manifest.webmanifest")
+def web_manifest():
+    return send_from_directory(
+        WEB_DIR, "manifest.webmanifest", mimetype="application/manifest+json"
+    )
+
+
+@app.get("/service-worker.js")
+def service_worker():
+    response = send_from_directory(WEB_DIR, "service-worker.js")
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"})
@@ -258,6 +277,31 @@ def rotate_login_session(user_id: int) -> str:
     web_session["user_id"] = user_id
     web_session["_csrf_token"] = secrets.token_urlsafe(32)
     return web_session["_csrf_token"]
+
+
+@app.post("/api/auth/guest")
+def create_guest_session():
+    guest_id = secrets.token_urlsafe(24)
+    try:
+        with engine.begin() as connection:
+            result = connection.execute(insert(users).values(
+                email=f"guest-{guest_id}@guest.invalid",
+                display_name="Learner",
+                password_hash=generate_password_hash(secrets.token_urlsafe(48)),
+                created_at=datetime.now().isoformat(timespec="seconds"),
+            ))
+            user_id = result.inserted_primary_key[0]
+    except SQLAlchemyError:
+        app.logger.exception("Guest session creation failed")
+        return jsonify({"error": "Could not start a guest session. Please try again."}), 500
+
+    token = rotate_login_session(int(user_id))
+    return jsonify({
+        "authenticated": True,
+        "name": "Learner",
+        "csrf_token": token,
+        "guest": True,
+    }), 201
 
 
 @app.post("/api/auth/register")
@@ -330,15 +374,27 @@ def logout():
 @app.get("/api/status")
 @login_required
 def api_status():
-    available = bool(os.environ.get("OPENAI_API_KEY"))
+    try:
+        status_request = urllib.request.Request(
+            OLLAMA_TAGS_URL,
+            headers=ollama_headers(),
+        )
+        with urllib.request.urlopen(status_request, timeout=3) as response:
+            installed_models = json.loads(response.read().decode("utf-8")).get("models", [])
+        available = any(model.get("name") == OLLAMA_MODEL for model in installed_models)
+        message = (
+            f"Joya is ready with Ollama model {OLLAMA_MODEL}."
+            if available
+            else f"Install the Ollama model with: ollama pull {OLLAMA_MODEL}"
+        )
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
+        app.logger.info("Could not reach the configured Ollama service: %s", error)
+        available = False
+        message = "Check the configured Ollama service and make sure it is reachable."
     return jsonify({
         "available": available,
-        "model": OPENAI_MODEL,
-        "message": (
-            f"Joya AI is ready with {OPENAI_MODEL}."
-            if available
-            else "The server administrator must configure OPENAI_API_KEY."
-        ),
+        "model": OLLAMA_MODEL,
+        "message": message,
     })
 
 
@@ -450,26 +506,6 @@ def api_history():
     return jsonify([dict(row) for row in reversed(result)])
 
 
-def reserve_ai_request():
-    today = date.today().isoformat()
-    insert_statement = (
-        sqlite_insert if engine.dialect.name == "sqlite" else postgres_insert
-    )
-    statement = insert_statement(ai_usage).values(
-        user_id=g.user_id,
-        usage_date=today,
-        requests=1,
-    )
-    statement = statement.on_conflict_do_update(
-        index_elements=[ai_usage.c.user_id, ai_usage.c.usage_date],
-        set_={"requests": ai_usage.c.requests + 1},
-        where=ai_usage.c.requests < AI_DAILY_LIMIT,
-    ).returning(ai_usage.c.requests)
-    with engine.begin() as connection:
-        requests_used = connection.execute(statement).scalar_one_or_none()
-    return requests_used is not None
-
-
 def validate_chat_prompt():
     payload = request.get_json(silent=True) or {}
     prompt = payload.get("prompt", "")
@@ -478,24 +514,32 @@ def validate_chat_prompt():
     prompt = prompt.strip()
     if len(prompt) > 4000:
         return None, (jsonify({"error": "Please keep questions under 4,000 characters."}), 400)
-    if not os.environ.get("OPENAI_API_KEY"):
-        return None, (
-            jsonify({"error": "Joya AI is not configured. The site administrator must add OPENAI_API_KEY in the hosting settings."}),
-            503,
-        )
-    if not reserve_ai_request():
-        return None, (
-            jsonify({"error": f"You have reached Joya's daily limit of {AI_DAILY_LIMIT} AI questions. Please try again tomorrow."}),
-            429,
-        )
     return prompt, None
 
 
-def openai_messages(prompt):
-    return [
-        {"role": "system", "content": JOYA_SYSTEM_PROMPT},
-        {"role": "user", "content": prompt},
-    ]
+def ollama_payload(prompt, stream=False):
+    return {
+        "model": OLLAMA_MODEL,
+        "messages": [
+            {"role": "system", "content": JOYA_SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        "stream": stream,
+        "think": False,
+        "options": {"temperature": 0.2, "num_predict": 768},
+    }
+
+
+def ollama_error_message(error):
+    if isinstance(error, urllib.error.HTTPError) and error.code == 404:
+        return f"Joya's Ollama model is missing. Install it with: ollama pull {OLLAMA_MODEL}"
+    if isinstance(error, urllib.error.HTTPError) and error.code in {401, 403}:
+        return "Ollama rejected the connection. Check the OLLAMA_API_KEY setting."
+    if isinstance(error, urllib.error.URLError):
+        return "Joya could not connect to the configured Ollama service."
+    if isinstance(error, (TimeoutError, OSError)):
+        return "Joya's request to Ollama timed out. Please try again."
+    return "Ollama could not complete the request. Please try again."
 
 
 @app.post("/api/chat")
@@ -505,23 +549,23 @@ def api_chat():
     if error:
         return error
     try:
-        client = OpenAI(timeout=120.0, max_retries=1)
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=openai_messages(prompt),
-            temperature=0.2,
-            max_tokens=768,
+        ollama_request = urllib.request.Request(
+            OLLAMA_URL,
+            data=json.dumps(ollama_payload(prompt)).encode("utf-8"),
+            headers=ollama_headers(),
+            method="POST",
         )
-        answer = response.choices[0].message.content
+        with urllib.request.urlopen(ollama_request, timeout=180) as response:
+            result = json.loads(response.read().decode("utf-8"))
+        message = result.get("message", {})
+        answer = message.get("content") if isinstance(message, dict) else None
         if not answer:
             return jsonify({"error": "Joya returned an empty answer. Please try again."}), 502
         save_history(g.user_id, prompt, answer)
         return jsonify({"answer": answer})
-    except APIConnectionError:
-        return jsonify({"error": "Joya could not connect to its AI provider. Please try again."}), 503
-    except APIStatusError as error:
-        app.logger.warning("AI provider returned HTTP %s", error.status_code)
-        return jsonify({"error": "Joya's AI provider could not complete the request."}), 502
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
+        app.logger.warning("Ollama chat request failed: %s", error)
+        return jsonify({"error": ollama_error_message(error)}), 503
 
 
 def save_history(user_id: int, prompt: str, answer: str) -> None:
@@ -557,19 +601,26 @@ def api_chat_stream():
     def generate():
         answer_parts = []
         try:
-            client = OpenAI(timeout=120.0, max_retries=1)
-            stream = client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=openai_messages(prompt),
-                temperature=0.2,
-                max_tokens=768,
-                stream=True,
+            ollama_request = urllib.request.Request(
+                OLLAMA_URL,
+                data=json.dumps(ollama_payload(prompt, stream=True)).encode("utf-8"),
+                headers=ollama_headers(),
+                method="POST",
             )
-            for chunk in stream:
-                token = chunk.choices[0].delta.content or ""
-                if token:
-                    answer_parts.append(token)
-                    yield sse_event({"token": token})
+            with urllib.request.urlopen(ollama_request, timeout=180) as response:
+                for line in response:
+                    if not line.strip():
+                        continue
+                    chunk = json.loads(line.decode("utf-8"))
+                    message = chunk.get("message", {})
+                    token = message.get("content", "") if isinstance(message, dict) else ""
+                    if not isinstance(token, str):
+                        continue
+                    if token:
+                        answer_parts.append(token)
+                        yield sse_event({"token": token})
+                    if chunk.get("error"):
+                        raise RuntimeError(chunk["error"])
             answer = "".join(answer_parts).strip()
             if not answer:
                 yield sse_event({"error": "Joya returned an empty answer. Please try again."})
@@ -580,11 +631,9 @@ def api_chat_stream():
                     app.logger.exception("Could not save chat history")
                     yield sse_event({"warning": "The answer arrived, but Joya could not save it to chat history."})
             yield sse_event({"done": True})
-        except APIConnectionError:
-            yield sse_event({"error": "Joya could not connect to its AI provider. Please try again."})
-        except APIStatusError as provider_error:
-            app.logger.warning("AI provider returned HTTP %s", provider_error.status_code)
-            yield sse_event({"error": "Joya's AI provider could not complete the request."})
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError, RuntimeError) as error:
+            app.logger.warning("Ollama streaming request failed: %s", error)
+            yield sse_event({"error": ollama_error_message(error)})
 
     return app.response_class(
         stream_with_context(generate()),

@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#10192d">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>Joya.ai — Learn with confidence</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
   <link rel="stylesheet" href="/app.css">
   <script src="/app.js" defer></script>
 </head>
@@ -13,7 +15,7 @@
   <section id="auth-screen" class="auth-screen hidden">
     <div class="auth-card">
       <a class="brand auth-brand" href="#" aria-label="Joya home">
-        <span class="brand-mark">J</span>
+        <img class="brand-mark" src="/logo.svg" alt="" aria-hidden="true">
         <span>joya<span class="brand-dot">.ai</span><small>LEARN. SOLVE. GROW.</small></span>
       </a>
       <span class="eyebrow">YOUR PERSONAL LEARNING SPACE</span>
@@ -24,6 +26,7 @@
         <label>Password<input name="password" type="password" autocomplete="current-password" minlength="10" required placeholder="At least 10 characters"></label>
         <button class="button button-primary" type="submit">Sign in <span>→</span></button>
         <p>New to Joya? <button id="show-register" class="text-button" type="button">Create an account</button></p>
+        <button id="guest-button" class="button button-outline" type="button">Start learning as a guest</button>
       </form>
       <form id="register-form" class="auth-form hidden">
         <label>Your name<input name="name" type="text" autocomplete="name" maxlength="48" required placeholder="How should Joya greet you?"></label>
@@ -33,14 +36,14 @@
         <p>Already have an account? <button id="show-login" class="text-button" type="button">Sign in</button></p>
       </form>
       <div id="auth-message" class="auth-message" role="alert"></div>
-      <p class="privacy-note">Your notes and conversations are private to your account. Use a unique password and do not share it.</p>
+      <p class="privacy-note">Guest progress is saved in this browser. Create an account to access your learning from other devices.</p>
     </div>
   </section>
 
   <div class="app-shell hidden" id="app-shell">
     <aside class="sidebar">
       <a class="brand" href="#" data-view="home" aria-label="Joya home">
-        <span class="brand-mark">J</span>
+        <img class="brand-mark" src="/logo.svg" alt="" aria-hidden="true">
         <span>joya<span class="brand-dot">.ai</span><small>LEARN. SOLVE. GROW.</small></span>
       </a>
       <div class="nav-label">LEARNING SPACE</div>

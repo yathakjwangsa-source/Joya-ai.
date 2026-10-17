@@ -27,7 +27,7 @@ button { cursor: pointer; }
 }
 .brand { display: flex; align-items: center; gap: 11px; color: inherit; text-decoration: none; font: 800 23px Manrope, sans-serif; letter-spacing: -.8px; }
 .brand-mark, .avatar, .message-avatar { display: grid; place-items: center; border-radius: 13px; background: linear-gradient(145deg, #a998ff, #6d53d4); color: white; font-weight: 800; }
-.brand-mark { width: 42px; height: 42px; font: 800 24px Manrope, sans-serif; }
+.brand-mark { display: block; width: 42px; height: 42px; flex: 0 0 42px; border-radius: 13px; }
 .brand-dot { color: #b5a7ff; }
 .brand small { display: block; margin-top: 2px; color: #8692ad; font: 700 8px "DM Sans", sans-serif; letter-spacing: 1.8px; }
 .nav-label, .eyebrow { color: #929db5; font-size: 10px; font-weight: 700; letter-spacing: 1.6px; }

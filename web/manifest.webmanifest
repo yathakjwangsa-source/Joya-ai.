@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "Joya.ai — Learn with confidence",
+  "short_name": "Joya.ai",
+  "description": "Your personal learning companion for concepts, notes, and JEE practice.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#10192d",
+  "theme_color": "#10192d",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

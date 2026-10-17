@@ -11,7 +11,11 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
-      - key: OPENAI_MODEL
-        value: gpt-4o-mini
+      - key: OLLAMA_URL
+        sync: false
+      - key: OLLAMA_API_KEY
+        sync: false
+      - key: OLLAMA_MODEL
+        value: qwen3.5:4b
       - key: JOYASECURECOOKIES
         value: "true"

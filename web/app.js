@@ -451,6 +451,12 @@ async function deleteNote(id) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/service-worker.js").catch((error) => {
+      console.error("Joya service worker registration failed:", error);
+    });
+  }
+
   const nameInput = $("#user-name");
   nameInput.value = "Learner";
   state.userName = nameInput.value;
@@ -474,6 +480,24 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   $("#login-form").addEventListener("submit", (event) => submitAuthentication(event, "login"));
   $("#register-form").addEventListener("submit", (event) => submitAuthentication(event, "register"));
+  $("#guest-button").addEventListener("click", async () => {
+    const button = $("#guest-button");
+    const message = $("#auth-message");
+    button.disabled = true;
+    message.textContent = "";
+    try {
+      const user = await api("/api/auth/guest", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setCsrfToken(user.csrf_token);
+      await setAuthenticated(user);
+    } catch (error) {
+      message.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
   $("#show-register").addEventListener("click", () => {
     $("#login-form").classList.add("hidden");
     $("#register-form").classList.remove("hidden");
